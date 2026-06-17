@@ -21,10 +21,22 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-        with:
-          api-level: 34
-          build-tools-version: '34.0.0'
-          cmdline-tools-version: latest
+
+      - name: Install Android Build Tools explicitly
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+            "platform-tools" \
+            "platforms;android-34" \
+            "build-tools;34.0.0" \
+            "ndk;25.2.9519653"
+
+      - name: Set Android environment variables
+        run: |
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "$ANDROID_HOME/build-tools/34.0.0" >> $GITHUB_PATH
+          echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -51,11 +63,13 @@ jobs:
           pip install --upgrade pip
           pip install Cython buildozer
 
-      - name: Build with Buildozer
-        env:
-          ANDROID_SDK_ROOT: ${{ env.ANDROID_HOME }}
+      - name: Verify AIDL is installed
         run: |
-          buildozer android debug
+          which aidl || echo "AIDL not found in PATH"
+          ls -la $ANDROID_HOME/build-tools/34.0.0/aidl
+
+      - name: Build with Buildozer
+        run: buildozer android debug
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
