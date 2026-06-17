@@ -19,6 +19,12 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          api-level: 34
+          build-tools-version: '34.0.0'
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -34,12 +40,19 @@ jobs:
             libxml2-dev \
             libxslt1-dev \
             libsqlite3-dev \
-            zlib1g-dev
+            zlib1g-dev \
+            lzip
 
       - name: Install Python dependencies
         run: |
           pip install --upgrade pip
           pip install Cython buildozer
+
+      - name: Create buildozer.spec (if not exists)
+        run: |
+          if [ ! -f buildozer.spec ]; then
+            buildozer init
+          fi
 
       - name: Build with Buildozer
         run: buildozer android debug
