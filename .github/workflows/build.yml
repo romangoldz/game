@@ -16,14 +16,15 @@ jobs:
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
+          java-version: '11'
           distribution: 'temurin'
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-        with:
-          api-level: 34
-          build-tools-version: '34.0.0'
+
+      - name: Install Android SDK tools
+        run: |
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -41,6 +42,8 @@ jobs:
             libxslt1-dev \
             libsqlite3-dev \
             zlib1g-dev \
+            git \
+            wget \
             lzip
 
       - name: Install Python dependencies
@@ -48,17 +51,18 @@ jobs:
           pip install --upgrade pip
           pip install Cython buildozer
 
-      - name: Create buildozer.spec (if not exists)
-        run: |
-          if [ ! -f buildozer.spec ]; then
-            buildozer init
-          fi
-
       - name: Build with Buildozer
-        run: buildozer android debug
+        env:
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_HOME }}
+          ANDROID_API: 34
+          ANDROID_MIN_API: 21
+          ANDROID_NDK_ROOT: ${{ env.ANDROID_HOME }}/ndk/25.2.9519653
+        run: |
+          buildozer android debug
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: package-apk
           path: bin/*.apk
