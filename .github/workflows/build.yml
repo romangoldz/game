@@ -1,0 +1,37 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install platform dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsqlite3-dev lzip standard-test-gcc-multilib-arm-linux-gnueabi
+
+      - name: Build with Buildozer
+        uses: ArtemGovorov/buildozer-action@v1
+        with:
+          command: buildozer android debug
+          buildozer_version: stable
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-apk
+          path: bin
+          /*.apk
