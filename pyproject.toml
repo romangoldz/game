@@ -20,5 +20,4 @@ author_email = "you@example.com"
 
 [tool.briefcase.app.myapp]
 formal_name = "My App"
-sources = ["app.py"]
-main_module = "app"
+sources = ["myapp"]
