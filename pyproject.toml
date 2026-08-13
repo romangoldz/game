@@ -1,0 +1,29 @@
+[build-system]
+requires = ["briefcase"]
+build-backend = "briefcase.build"
+
+[project]
+name = "myapp"
+version = "0.1.0"
+description = "My BeeWare app"
+readme = "README.md"
+authors = [{name = "Your Name", email = "you@example.com"}]
+requires-python = ">=3.8"
+dependencies = ["toga"]
+
+[tool.briefcase]
+project_name = "myapp"
+bundle = "com.example"
+version = "0.1.0"
+description = "My BeeWare app"
+author = "Your Name"
+author_email = "you@example.com"
+url = "https://example.com"
+license = "MIT"
+
+[tool.briefcase.app.myapp]
+formal_name = "My App"
+sources = ["app.py"]
+
+[tool.briefcase.platforms.android]
+# Android-specific settings
