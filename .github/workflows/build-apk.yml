@@ -1,10 +1,9 @@
-
 name: Build Pygame APK
 
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:  # Дозволяє запуск вручну
+  workflow_dispatch:
 
 jobs:
   build:
@@ -22,26 +21,27 @@ jobs:
         sudo apt update
         sudo apt install -y openjdk-17-jdk unzip zip \
           autoconf libtool pkg-config zlib1g-dev \
-          libncurses5-dev libncursesw5-dev libtinfo5 \
+          libncurses5-dev libncursesw5-dev \
           cmake libffi-dev libssl-dev
         pip install --upgrade pip
         pip install buildozer cython
 
     - name: Configure Buildozer
       run: |
-        # Створюємо базовий spec-файл
         buildozer init
-        # Правимо налаштування для pygame
+        # Базові налаштування
+        sed -i 's/^#.*requirements.*/requirements = python3,pygame/' buildozer.spec
         sed -i 's/^#.*package.name.*/package.name = mygame/' buildozer.spec
         sed -i 's/^#.*package.domain.*/package.domain = org.mygame/' buildozer.spec
         sed -i 's/^#.*android.api.*/android.api = 33/' buildozer.spec
         sed -i 's/^#.*android.minapi.*/android.minapi = 21/' buildozer.spec
         sed -i 's/^#.*android.ndk.*/android.ndk = 25b/' buildozer.spec
         sed -i 's/^#.*android.sdk.*/android.sdk = 33/' buildozer.spec
+        # Вимкнути бібліотеки, які викликають помилки
+        sed -i 's/^#.*android.gradle_dependencies.*/android.gradle_dependencies = /' buildozer.spec
 
     - name: Build APK
       run: |
-        # Перший запуск завантажить NDK/SDK (може зайняти 15-20 хв)
         buildozer -v android debug
 
     - name: Upload APK
