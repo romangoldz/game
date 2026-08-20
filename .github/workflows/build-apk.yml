@@ -32,7 +32,6 @@ jobs:
         # Створюємо базовий spec-файл
         buildozer init
         # Правимо налаштування для pygame
-        sed -i 's/^#.*requirements.*/requirements = python3,pygame/' buildozer.spec
         sed -i 's/^#.*package.name.*/package.name = mygame/' buildozer.spec
         sed -i 's/^#.*package.domain.*/package.domain = org.mygame/' buildozer.spec
         sed -i 's/^#.*android.api.*/android.api = 33/' buildozer.spec
