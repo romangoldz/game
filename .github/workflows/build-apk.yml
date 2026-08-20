@@ -12,24 +12,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install missing Android SDK components
+      - name: Install dependencies and Android SDK
         run: |
-          # Встановлюємо SDK Manager
+          # Встановлюємо wget та інші необхідні пакети
+          apt-get update
+          apt-get install -y wget unzip
+          
+          # Встановлюємо Android SDK
           export ANDROID_HOME=/github/home/.buildozer/android/platform/android-sdk
           mkdir -p $ANDROID_HOME
           
-          # Завантажуємо command-line tools
           cd /tmp
           wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
           unzip -q commandlinetools-linux-11076708_latest.zip
           mkdir -p $ANDROID_HOME/cmdline-tools
           mv cmdline-tools $ANDROID_HOME/cmdline-tools/latest
           
-          # Встановлюємо build-tools та platform-tools
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;30.0.3" "platform-tools" "platforms;android-30" > /dev/null 2>&1
-          
-          echo "Android SDK installed successfully"
 
       - name: Create buildozer.spec
         run: |
