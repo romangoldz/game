@@ -1,4 +1,4 @@
-name: Build Pygame APK
+name: Build APK with Docker
 
 on:
   workflow_dispatch:
@@ -6,54 +6,50 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: ubuntu:22.04
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-
-      - name: Install system dependencies
+      - name: Install all dependencies
         run: |
-          sudo apt update
-          sudo apt install -y openjdk-17-jdk unzip zip \
-            autoconf libtool pkg-config zlib1g-dev \
-            libncurses5-dev libncursesw5-dev \
-            cmake libffi-dev libssl-dev git wget
-          pip install buildozer cython
+          apt-get update
+          apt-get install -y python3 python3-pip python3-venv \
+            openjdk-17-jdk unzip zip autoconf libtool \
+            pkg-config zlib1g-dev libncurses5-dev \
+            libncursesw5-dev cmake libffi-dev libssl-dev \
+            git wget
+          python3 -m pip install --upgrade pip
+          python3 -m pip install buildozer cython
 
-      - name: Setup Android SDK manually
+      - name: Install Android SDK
         run: |
-          export ANDROID_HOME=$HOME/.buildozer/android/platform/android-sdk
+          export ANDROID_HOME=/root/.buildozer/android/platform/android-sdk
           mkdir -p $ANDROID_HOME
           
-          # Завантажуємо command-line tools
           cd $ANDROID_HOME
           wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
           unzip -q commandlinetools-linux-11076708_latest.zip
           rm commandlinetools-linux-11076708_latest.zip
           
-          # Створюємо правильну структуру
           mkdir -p cmdline-tools
           mv cmdline-tools cmdline-tools/latest
           
-          # Встановлюємо змінні
-          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
-          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
-          
-          # Встановлюємо SDK компоненти (включаючи build-tools з aidl)
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses --sdk_root=$ANDROID_HOME < /dev/null || true
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-30" "build-tools;30.0.3" --sdk_root=$ANDROID_HOME < /dev/null
+          
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
+          echo "$ANDROID_HOME/build-tools/30.0.3" >> $GITHUB_PATH
 
-      - name: Install NDK 28c
+      - name: Install NDK
         run: |
-          cd $HOME/.buildozer/android/platform
+          cd /root/.buildozer/android/platform
           wget -q https://dl.google.com/android/repository/android-ndk-r28c-linux.zip
           unzip -q android-ndk-r28c-linux.zip
           rm android-ndk-r28c-linux.zip
-          echo "ANDROIDNDK=$HOME/.buildozer/android/platform/android-ndk-r28c" >> $GITHUB_ENV
+          echo "ANDROIDNDK=/root/.buildozer/android/platform/android-ndk-r28c" >> $GITHUB_ENV
 
       - name: Create buildozer.spec
         run: |
@@ -74,20 +70,17 @@ jobs:
 
           [buildozer]
           log_level = 2
+          warn_on_root = 0
           EOF
 
       - name: Build APK
         run: |
-          export ANDROID_HOME=$HOME/.buildozer/android/platform/android-sdk
-          export ANDROIDNDK=$HOME/.buildozer/android/platform/android-ndk-r28c
+          export ANDROID_HOME=/root/.buildozer/android/platform/android-sdk
+          export ANDROIDNDK=/root/.buildozer/android/platform/android-ndk-r28c
           export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
           export PATH=$ANDROID_HOME/build-tools/30.0.3:$PATH
           
-          # Перевіряємо що aidl доступний
-          which aidl || echo "aidl not found, checking build-tools..."
-          ls -la $ANDROID_HOME/build-tools/30.0.3/ || echo "build-tools not found"
-          
-          buildozer -v android debug
+          yes | buildozer -v android debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
