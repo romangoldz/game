@@ -15,25 +15,46 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Ensure buildozer.spec exists
+      - name: Ensure buildozer.spec exists (generate if missing)
+        env:
+          TITLE: "${{ env.TITLE }}"
+          PACKAGE_NAME: "${{ env.PACKAGE_NAME }}"
+          PACKAGE_DOMAIN: "${{ env.PACKAGE_DOMAIN }}"
+          REQUIREMENTS: "${{ env.REQUIREMENTS }}"
+          SOURCE_MAIN: "${{ env.SOURCE_MAIN }}"
         run: |
           if [ ! -f buildozer.spec ]; then
-            echo "ERROR: buildozer.spec not found in repo root"
-            exit 1
+            echo "buildozer.spec not found — generating a minimal one"
+            cat > buildozer.spec <<EOF
+[app]
+# (replace/override with env variables in workflow if needed)
+title = ${TITLE:-MyApp}
+package.name = ${PACKAGE_NAME:-myapp}
+package.domain = ${PACKAGE_DOMAIN:-org.test}
+source.dir = .
+source.main = ${SOURCE_MAIN:-main.py}
+version = 0.1
+
+requirements = ${REQUIREMENTS:-python3,kivy}
+
+orientation = portrait
+# Android settings (tune as needed)
+android.api = 33
+android.arch = armeabi-v7a, arm64-v8a
+# android.ndk = 25b
+# p4a.branch = stable
+EOF
+          else
+            echo "buildozer.spec found"
           fi
 
-      - name: Show Python & Buildozer version
-        run: |
-          python --version || true
-          buildozer --version || true
+      - name: Show buildozer.spec
+        run: sed -n '1,200p' buildozer.spec || true
 
       - name: Build .apk (debug)
         run: |
-          # Якщо потрібно - очистити попередні артефакти
           rm -rf .buildozer bin || true
-          # Головна команда збірки
           buildozer -v android debug
-        # Приблизні змінні середовища, якщо образ їх очікує / ви хочете перевизначити
         env:
           ANDROIDSDK: /opt/android-sdk
           ANDROIDNDK: /opt/android-ndk
