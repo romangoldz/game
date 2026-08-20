@@ -21,40 +21,8 @@ jobs:
           sudo apt install -y openjdk-17-jdk unzip zip \
             autoconf libtool pkg-config zlib1g-dev \
             libncurses5-dev libncursesw5-dev \
-            cmake libffi-dev libssl-dev git wget
+            cmake libffi-dev libssl-dev git
           pip install buildozer cython
-
-      - name: Install Android SDK
-        run: |
-          export ANDROID_HOME=$HOME/.buildozer/android/platform/android-sdk
-          mkdir -p $ANDROID_HOME
-          
-          # Завантажуємо command-line tools
-          cd $ANDROID_HOME
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
-          unzip -q commandlinetools-linux-11076708_latest.zip
-          rm commandlinetools-linux-11076708_latest.zip
-          
-          # Створюємо правильну структуру
-          mkdir -p $ANDROID_HOME/cmdline-tools
-          mv $ANDROID_HOME/cmdline-tools $ANDROID_HOME/cmdline-tools/latest 2>/dev/null || true
-          
-          # Додаємо sdkmanager до PATH
-          export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
-          
-          # Встановлюємо компоненти SDK
-          yes | sdkmanager --licenses > /dev/null 2>&1
-          sdkmanager "build-tools;30.0.3" "platform-tools" "platforms;android-30" > /dev/null 2>&1
-          
-          echo "Android SDK installed successfully"
-
-      - name: Install Android NDK 28c
-        run: |
-          cd $HOME/.buildozer/android/platform
-          wget -q https://dl.google.com/android/repository/android-ndk-r28c-linux.zip
-          unzip -q android-ndk-r28c-linux.zip
-          rm android-ndk-r28c-linux.zip
-          echo "NDK 28c installed successfully"
 
       - name: Create buildozer.spec
         run: |
@@ -79,9 +47,6 @@ jobs:
 
       - name: Build APK
         run: |
-          export ANDROID_HOME=$HOME/.buildozer/android/platform/android-sdk
-          export ANDROIDNDK=$HOME/.buildozer/android/platform/android-ndk-r28c
-          export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
           buildozer -v android debug
 
       - name: Upload APK
