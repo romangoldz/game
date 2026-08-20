@@ -10,31 +10,31 @@ jobs:
       image: kivy/buildozer:latest
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Create buildozer.spec
-      run: |
-        cat > buildozer.spec << 'EOF'
-[app]
-title = My Game
-package.name = mygame
-package.domain = org.mygame
-source.dir = .
-requirements = python3,pygame
-android.api = 33
-android.minapi = 21
-android.ndk = 25b
-android.sdk = 33
-fullscreen = 1
-orientation = landscape
-EOF
+      - name: Create buildozer.spec
+        run: |
+          cat > buildozer.spec << 'EOF'
+          [app]
+          title = My Game
+          package.name = mygame
+          package.domain = org.mygame
+          source.dir = .
+          requirements = python3,pygame
+          android.api = 33
+          android.minapi = 21
+          android.ndk = 25b
+          android.sdk = 33
+          fullscreen = 1
+          orientation = landscape
+          EOF
 
-    - name: Build APK
-      run: |
-        buildozer -v android debug
+      - name: Build APK
+        run: |
+          buildozer -v android debug
 
-    - name: Upload APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: pygame-apk
-        path: bin/*.apk
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: pygame-apk
+          path: bin/*.apk
