@@ -1,142 +1,137 @@
-import pygame
-import sys
+from kivy.app import App
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.button import Button
+from kivy.uix.label import Label
+from kivy.core.window import Window
+from kivy.clock import Clock
 import random
 
-# Ініціалізація
-pygame.init()
+Window.size = (400, 600)  # Розмір вікна для зручності
 
-# Налаштування екрану
-WIDTH, HEIGHT = 800, 600
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Збиралка з сенсорним керуванням")
-
-# Кольори
-WHITE = (255, 255, 255)
-BLACK = (0, 0, 0)
-RED = (255, 0, 0)
-GREEN = (0, 255, 0)
-BLUE = (0, 0, 255)
-YELLOW = (255, 255, 0)
-PURPLE = (128, 0, 128)
-
-# Граввець
-player_size = 40
-player_x = WIDTH // 2 - player_size // 2
-player_y = HEIGHT // 2 - player_size // 2
-player_speed = 5
-
-# М'ячі (цілі)
-ball_radius = 15
-balls = []
-score = 0
-font = pygame.font.Font(None, 36)
-
-# Змінні для сенсорного керування
-touch_pos = None
-move_x = 0
-move_y = 0
-
-def create_ball():
-    x = random.randint(ball_radius, WIDTH - ball_radius)
-    y = random.randint(ball_radius, HEIGHT - ball_radius)
-    color = random.choice([RED, GREEN, BLUE, YELLOW, PURPLE])
-    return {'x': x, 'y': y, 'radius': ball_radius, 'color': color}
-
-# Створюємо початкові м'ячі
-for _ in range(10):
-    balls.append(create_ball())
-
-# Головний цикл
-clock = pygame.time.Clock()
-running = True
-
-while running:
-    # Обробка подій
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
+class ClickerGame(BoxLayout):
+    def __init__(self, **kwargs):
+        super().__init__(orientation='vertical', padding=20, spacing=20, **kwargs)
         
-        # Сенсорне/мишине керування
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            touch_pos = pygame.mouse.get_pos()
-            # Розраховуємо напрямок руху до точки дотику
-            dx = touch_pos[0] - (player_x + player_size // 2)
-            dy = touch_pos[1] - (player_y + player_size // 2)
-            distance = (dx**2 + dy**2)**0.5
-            if distance > 0:
-                move_x = (dx / distance) * player_speed
-                move_y = (dy / distance) * player_speed
-            else:
-                move_x = 0
-                move_y = 0
+        # Рядок з рахунком та рекордом
+        score_layout = BoxLayout(size_hint_y=0.2, spacing=10)
+        self.score_label = Label(text='Рахунок: 0', font_size='28sp', bold=True)
+        self.record_label = Label(text='Рекорд: 0', font_size='20sp', color=(0.8, 0.8, 0, 1))
+        score_layout.add_widget(self.score_label)
+        score_layout.add_widget(self.record_label)
+        self.add_widget(score_layout)
         
-        if event.type == pygame.MOUSEBUTTONUP:
-            touch_pos = None
-            move_x = 0
-            move_y = 0
+        # Кнопка для кліків (головний елемент)
+        self.click_btn = Button(
+            text='ТИСНИ МЕНЕ!',
+            font_size='32sp',
+            background_color=(0.2, 0.6, 1, 1),
+            size_hint=(1, 0.5)
+        )
+        self.click_btn.bind(on_press=self.on_click)
+        self.add_widget(self.click_btn)
         
-        # Клавіатурне керування (для тестування на ПК)
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_LEFT:
-                move_x = -player_speed
-            elif event.key == pygame.K_RIGHT:
-                move_x = player_speed
-            elif event.key == pygame.K_UP:
-                move_y = -player_speed
-            elif event.key == pygame.K_DOWN:
-                move_y = player_speed
+        # Інформаційна панель
+        info_layout = BoxLayout(size_hint_y=0.15, spacing=10)
+        self.combo_label = Label(text='Комбо: 1x', font_size='20sp')
+        self.timer_label = Label(text='Час: 0.0с', font_size='20sp')
+        info_layout.add_widget(self.combo_label)
+        info_layout.add_widget(self.timer_label)
+        self.add_widget(info_layout)
         
-        if event.type == pygame.KEYUP:
-            if event.key in [pygame.K_LEFT, pygame.K_RIGHT]:
-                move_x = 0
-            if event.key in [pygame.K_UP, pygame.K_DOWN]:
-                move_y = 0
-    
-    # Рух гравця
-    player_x += move_x
-    player_y += move_y
-    
-    # Обмеження руху гравця межами екрану
-    player_x = max(0, min(player_x, WIDTH - player_size))
-    player_y = max(0, min(player_y, HEIGHT - player_size))
-    
-    # Перевірка зіткнень з м'ячами
-    player_center_x = player_x + player_size // 2
-    player_center_y = player_y + player_size // 2
-    
-    for ball in balls[:]:
-        dx = player_center_x - ball['x']
-        dy = player_center_y - ball['y']
-        distance = (dx**2 + dy**2)**0.5
+        # Кнопки керування
+        control_layout = BoxLayout(size_hint_y=0.15, spacing=10)
+        reset_btn = Button(text='Скинути', font_size='18sp', background_color=(1, 0.3, 0.3, 1))
+        reset_btn.bind(on_press=self.reset_game)
+        control_layout.add_widget(reset_btn)
         
-        if distance < player_size // 2 + ball['radius']:
-            balls.remove(ball)
-            score += 1
-            # Створюємо новий м'яч
-            balls.append(create_ball())
+        self.auto_btn = Button(text='Авто-клік: Вимк.', font_size='18sp', background_color=(0.4, 0.4, 0.4, 1))
+        self.auto_btn.bind(on_press=self.toggle_auto)
+        control_layout.add_widget(self.auto_btn)
+        self.add_widget(control_layout)
+        
+        # Стан гри
+        self.score = 0
+        self.record = 0
+        self.combo = 1
+        self.time = 0.0
+        self.is_auto = False
+        self.auto_event = None
+        self.timer_event = Clock.schedule_interval(self.update_timer, 0.1)
+        
+        # Завантажуємо рекорд (зберігається в пам'яті)
+        self.load_record()
     
-    # Малювання
-    screen.fill(WHITE)
+    def on_click(self, instance):
+        """Обробка кліку по кнопці"""
+        self.score += self.combo
+        self.combo += 0.2  # Поступове збільшення комбо
+        self.update_score()
+        
+        # Візуальний ефект - зміна кольору
+        self.click_btn.background_color = (
+            random.uniform(0.2, 0.8),
+            random.uniform(0.4, 1),
+            random.uniform(0.2, 0.8),
+            1
+        )
+        # Повертаємо колір через 0.1с
+        Clock.schedule_once(lambda dt: setattr(self.click_btn, 'background_color', (0.2, 0.6, 1, 1)), 0.1)
     
-    # Малюємо м'ячі
-    for ball in balls:
-        pygame.draw.circle(screen, ball['color'], (ball['x'], ball['y']), ball['radius'])
+    def update_score(self):
+        """Оновлює відображення рахунку та рекорду"""
+        self.score_label.text = f'Рахунок: {int(self.score)}'
+        self.combo_label.text = f'Комбо: {self.combo:.1f}x'
+        if self.score > self.record:
+            self.record = self.score
+            self.record_label.text = f'Рекорд: {int(self.record)}'
+            self.save_record()
     
-    # Малюємо гравця
-    pygame.draw.rect(screen, BLACK, (player_x, player_y, player_size, player_size))
-    pygame.draw.rect(screen, RED, (player_x + 5, player_y + 5, player_size - 10, player_size - 10))
+    def update_timer(self, dt):
+        """Оновлює таймер гри"""
+        self.time += dt
+        self.timer_label.text = f'Час: {self.time:.1f}с'
     
-    # Відображення рахунку
-    score_text = font.render(f"Рахунок: {score}", True, BLACK)
-    screen.blit(score_text, (10, 10))
+    def reset_game(self, instance):
+        """Скидання гри"""
+        self.score = 0
+        self.combo = 1
+        self.time = 0.0
+        self.click_btn.background_color = (0.2, 0.6, 1, 1)
+        self.update_score()
+        self.timer_label.text = 'Час: 0.0с'
+        self.combo_label.text = 'Комбо: 1x'
+        
+        # Якщо авто-клік увімкнено - вимикаємо
+        if self.is_auto:
+            self.toggle_auto(None)
     
-    # Відображення підказки
-    if touch_pos:
-        hint_text = font.render("Торкніться екрану для руху", True, BLACK)
-        screen.blit(hint_text, (WIDTH // 2 - 150, HEIGHT - 40))
+    def toggle_auto(self, instance):
+        """Вмикає/вимикає автоматичний клік"""
+        self.is_auto = not self.is_auto
+        self.auto_btn.text = f'Авто-клік: {"Увімк." if self.is_auto else "Вимк."}'
+        self.auto_btn.background_color = (0.2, 0.8, 0.2, 1) if self.is_auto else (0.4, 0.4, 0.4, 1)
+        
+        if self.is_auto:
+            self.auto_event = Clock.schedule_interval(lambda dt: self.on_click(None), 0.3)
+        else:
+            if self.auto_event:
+                self.auto_event.cancel()
+                self.auto_event = None
     
-    pygame.display.flip()
-    clock.tick(60)
+    def load_record(self):
+        """Завантажує рекорд (тут просто ініціалізація)"""
+        # В реальному додатку тут було б завантаження з файлу
+        self.record = 0
+        self.record_label.text = f'Рекорд: {self.record}'
+    
+    def save_record(self):
+        """Зберігає рекорд (тут просто заглушка)"""
+        # В реальному додатку тут було б збереження в файл
+        pass
 
-pygame.quit()
-sys.exit()
+class MyGameApp(App):
+    def build(self):
+        return ClickerGame()
+
+if __name__ == '__main__':
+    MyGameApp().run()
