@@ -4,6 +4,15 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Type of build'
+        required: false
+        default: 'debug'
+        type: choice
+        options:
+          - debug
+          - release
 
 jobs:
   build-apk:
@@ -11,56 +20,80 @@ jobs:
     container:
       image: docker://kivy/buildozer:latest
 
+    env:
+      BUILD_TYPE: ${{ github.event.inputs.build_type || 'debug' }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Ensure buildozer.spec exists (generate if missing)
-        env:
-          TITLE: "${{ env.TITLE }}"
-          PACKAGE_NAME: "${{ env.PACKAGE_NAME }}"
-          PACKAGE_DOMAIN: "${{ env.PACKAGE_DOMAIN }}"
-          REQUIREMENTS: "${{ env.REQUIREMENTS }}"
-          SOURCE_MAIN: "${{ env.SOURCE_MAIN }}"
+      - name: Verify buildozer.spec present
         run: |
           if [ ! -f buildozer.spec ]; then
-            echo "buildozer.spec not found — generating a minimal one"
-            cat > buildozer.spec <<EOF
-[app]
-# (replace/override with env variables in workflow if needed)
-title = ${TITLE:-MyApp}
-package.name = ${PACKAGE_NAME:-myapp}
-package.domain = ${PACKAGE_DOMAIN:-org.test}
-source.dir = .
-source.main = ${SOURCE_MAIN:-main.py}
-version = 0.1
-
-requirements = ${REQUIREMENTS:-python3,kivy}
-
-orientation = portrait
-# Android settings (tune as needed)
-android.api = 33
-android.arch = armeabi-v7a, arm64-v8a
-# android.ndk = 25b
-# p4a.branch = stable
-EOF
-          else
-            echo "buildozer.spec found"
+            echo "ERROR: buildozer.spec not found in repo root"
+            exit 1
           fi
+          echo "Using build type: $BUILD_TYPE"
+          sed -n '1,200p' buildozer.spec || true
 
-      - name: Show buildozer.spec
-        run: sed -n '1,200p' buildozer.spec || true
+      - name: Setup keystore for release (from secret)
+        if: ${{ env.BUILD_TYPE == 'release' && secrets.KEYSTORE_BASE64 != '' }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          echo "Writing keystore to android.keystore"
+          echo "$KEYSTORE_BASE64" | base64 -d > android.keystore
+          # Ensure permissions
+          chmod 600 android.keystore
 
-      - name: Build .apk (debug)
+          # Add/replace release signing lines in buildozer.spec
+          # If your buildozer.spec already contains these keys, you can skip or adjust this block.
+          python - <<'PY'
+import sys,io
+p = 'buildozer.spec'
+s = open(p,'r',encoding='utf-8').read()
+def set_key(s, key, val):
+    if key in s:
+        import re
+        s = re.sub(r'(?m)^{0}\s*=.*$'.format(key), f"{key} = {val}", s)
+    else:
+        s = s + f"\n{key} = {val}\n"
+    return s
+s = set_key(s, 'android.release_keystore', 'android.keystore')
+s = set_key(s, 'android.release_keyalias', '"{}"'.format('${KEY_ALIAS}'))
+s = set_key(s, 'android.release_keystore_password', '"{}"'.format('${KEYSTORE_PASSWORD}'))
+s = set_key(s, 'android.release_keyalias_password', '"{}"'.format('${KEY_PASSWORD}'))
+open(p,'w',encoding='utf-8').write(s)
+print('Updated buildozer.spec with keystore settings')
+PY
+          # Replace placeholders in spec with actual secret values (safe within runner)
+          sed -i "s|\${KEY_ALIAS}|${KEY_ALIAS}|g" buildozer.spec
+          sed -i "s|\${KEYSTORE_PASSWORD}|${KEYSTORE_PASSWORD}|g" buildozer.spec
+          sed -i "s|\${KEY_PASSWORD}|${KEY_PASSWORD}|g" buildozer.spec
+
+      - name: Build APK / AAB
         run: |
           rm -rf .buildozer bin || true
-          buildozer -v android debug
+          if [ "$BUILD_TYPE" = "release" ]; then
+            buildozer -v android release
+          else
+            buildozer -v android debug
+          fi
+        # за потреби додайте змінні середовища для специфічних образів
         env:
           ANDROIDSDK: /opt/android-sdk
           ANDROIDNDK: /opt/android-ndk
 
-      - name: Upload built APK
+      - name: List bin folder
+        run: ls -lah bin || true
+
+      - name: Upload built artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: android-apk
-          path: bin/*.apk
+          name: android-artifacts
+          path: |
+            bin/*.apk
+            bin/*.aab
