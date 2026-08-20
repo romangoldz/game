@@ -21,8 +21,42 @@ jobs:
           sudo apt install -y openjdk-17-jdk unzip zip \
             autoconf libtool pkg-config zlib1g-dev \
             libncurses5-dev libncursesw5-dev \
-            cmake libffi-dev libssl-dev git
+            cmake libffi-dev libssl-dev git wget
           pip install buildozer cython
+
+      - name: Install Android SDK
+        run: |
+          export ANDROID_HOME=$HOME/.buildozer/android/platform/android-sdk
+          mkdir -p $ANDROID_HOME
+          
+          cd $ANDROID_HOME
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+          unzip -q commandlinetools-linux-11076708_latest.zip
+          rm commandlinetools-linux-11076708_latest.zip
+          
+          # Правильна структура для cmdline-tools
+          mkdir -p $ANDROID_HOME/cmdline-tools
+          mv $ANDROID_HOME/cmdline-tools $ANDROID_HOME/cmdline-tools/latest 2>/dev/null || true
+          
+          # Перевіряємо що sdkmanager існує
+          ls -la $ANDROID_HOME/cmdline-tools/latest/bin/
+          
+          # Додаємо до PATH та встановлюємо компоненти
+          export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
+          
+          # Встановлюємо SDK компоненти
+          sdkmanager --licenses --sdk_root=$ANDROID_HOME < /dev/null || true
+          sdkmanager "build-tools;30.0.3" "platform-tools" "platforms;android-30" --sdk_root=$ANDROID_HOME < /dev/null || true
+
+      - name: Install Android NDK 28c
+        run: |
+          cd $HOME/.buildozer/android/platform
+          wget -q https://dl.google.com/android/repository/android-ndk-r28c-linux.zip
+          unzip -q android-ndk-r28c-linux.zip
+          rm android-ndk-r28c-linux.zip
+          echo "NDK_HOME=$HOME/.buildozer/android/platform/android-ndk-r28c" >> $GITHUB_ENV
 
       - name: Create buildozer.spec
         run: |
@@ -47,6 +81,13 @@ jobs:
 
       - name: Build APK
         run: |
+          export ANDROID_HOME=$HOME/.buildozer/android/platform/android-sdk
+          export ANDROIDNDK=$HOME/.buildozer/android/platform/android-ndk-r28c
+          export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
+          
+          # Перевіряємо що sdkmanager доступний
+          which sdkmanager || echo "sdkmanager not found"
+          
           buildozer -v android debug
 
       - name: Upload APK
