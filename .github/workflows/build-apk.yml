@@ -1,90 +1,45 @@
-name: Build Pygame APK
+name: Build Android APK
 
 on:
+  push:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
-  build:
+  build-apk:
     runs-on: ubuntu-latest
+    container:
+      image: docker://kivy/buildozer:latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-
-      - name: Install dependencies
+      - name: Ensure buildozer.spec exists
         run: |
-          sudo apt update
-          sudo apt install -y openjdk-17-jdk unzip zip \
-            autoconf libtool pkg-config zlib1g-dev \
-            libncurses5-dev libncursesw5-dev \
-            cmake libffi-dev libssl-dev git wget
-          pip install buildozer cython
+          if [ ! -f buildozer.spec ]; then
+            echo "ERROR: buildozer.spec not found in repo root"
+            exit 1
+          fi
 
-      - name: Setup Android SDK
+      - name: Show Python & Buildozer version
         run: |
-          export ANDROID_HOME=$HOME/.buildozer/android/platform/android-sdk
-          mkdir -p $ANDROID_HOME
-          
-          cd $ANDROID_HOME
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
-          unzip -q commandlinetools-linux-11076708_latest.zip
-          rm commandlinetools-linux-11076708_latest.zip
-          
-          # Створюємо правильну структуру для cmdline-tools
-          mkdir -p cmdline-tools
-          mv cmdline-tools cmdline-tools/latest
-          
-          # Встановлюємо змінні середовища
-          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
-          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
-          echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
-          
-          # Встановлюємо SDK компоненти
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses --sdk_root=$ANDROID_HOME < /dev/null || true
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-30" "build-tools;30.0.3" --sdk_root=$ANDROID_HOME < /dev/null || true
+          python --version || true
+          buildozer --version || true
 
-      - name: Install NDK
+      - name: Build .apk (debug)
         run: |
-          cd $HOME/.buildozer/android/platform
-          wget -q https://dl.google.com/android/repository/android-ndk-r28c-linux.zip
-          unzip -q android-ndk-r28c-linux.zip
-          rm android-ndk-r28c-linux.zip
-
-      - name: Create buildozer.spec
-        run: |
-          cat > buildozer.spec << 'EOF'
-          [app]
-          title = My Game
-          package.name = mygame
-          package.domain = org.mygame
-          source.dir = .
-          version = 0.1
-          requirements = python3,pygame
-          orientation = landscape
-          fullscreen = 1
-          android.api = 30
-          android.minapi = 21
-          android.ndk = 28c
-          android.sdk = 30
-
-          [buildozer]
-          log_level = 2
-          EOF
-
-      - name: Build APK
-        run: |
-          export ANDROID_HOME=$HOME/.buildozer/android/platform/android-sdk
-          export ANDROIDNDK=$HOME/.buildozer/android/platform/android-ndk-r28c
-          export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
-          export PATH=$ANDROID_HOME/build-tools/30.0.3:$PATH
+          # Якщо потрібно - очистити попередні артефакти
+          rm -rf .buildozer bin || true
+          # Головна команда збірки
           buildozer -v android debug
+        # Приблизні змінні середовища, якщо образ їх очікує / ви хочете перевизначити
+        env:
+          ANDROIDSDK: /opt/android-sdk
+          ANDROIDNDK: /opt/android-ndk
 
-      - name: Upload APK
+      - name: Upload built APK
         uses: actions/upload-artifact@v4
         with:
-          name: pygame-apk
+          name: android-apk
           path: bin/*.apk
