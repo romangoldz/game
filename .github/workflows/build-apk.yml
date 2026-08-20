@@ -1,4 +1,4 @@
-name: Build APK with Docker
+name: Build Pygame APK
 
 on:
   workflow_dispatch:
@@ -6,26 +6,27 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container:
-      image: ubuntu:22.04
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install all dependencies
-        run: |
-          apt-get update
-          apt-get install -y python3 python3-pip python3-venv \
-            openjdk-17-jdk unzip zip autoconf libtool \
-            pkg-config zlib1g-dev libncurses5-dev \
-            libncursesw5-dev cmake libffi-dev libssl-dev \
-            git wget
-          python3 -m pip install --upgrade pip
-          python3 -m pip install buildozer cython
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
 
-      - name: Install Android SDK
+      - name: Install system dependencies
         run: |
-          export ANDROID_HOME=/root/.buildozer/android/platform/android-sdk
+          sudo apt update
+          sudo apt install -y openjdk-17-jdk unzip zip \
+            autoconf libtool pkg-config zlib1g-dev \
+            libncurses5-dev libncursesw5-dev \
+            cmake libffi-dev libssl-dev git wget
+          pip install buildozer cython
+
+      - name: Setup Android SDK manually
+        run: |
+          export ANDROID_HOME=$HOME/.buildozer/android/platform/android-sdk
           mkdir -p $ANDROID_HOME
           
           cd $ANDROID_HOME
@@ -33,23 +34,30 @@ jobs:
           unzip -q commandlinetools-linux-11076708_latest.zip
           rm commandlinetools-linux-11076708_latest.zip
           
+          # Правильна структура: cmdline-tools/latest/
           mkdir -p cmdline-tools
-          mv cmdline-tools cmdline-tools/latest
+          mv cmdline-tools cmdline-tools/latest 2>/dev/null || true
+          # Якщо вище не спрацювало, робимо інакше
+          if [ ! -d "$ANDROID_HOME/cmdline-tools/latest" ]; then
+            mkdir -p cmdline-tools/latest
+            mv bin lib LICENSE NOTICE source.properties cmdline-tools/latest/ 2>/dev/null || true
+          fi
           
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses --sdk_root=$ANDROID_HOME < /dev/null || true
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-30" "build-tools;30.0.3" --sdk_root=$ANDROID_HOME < /dev/null
-          
+          # Встановлюємо змінні
           echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
           echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
-          echo "$ANDROID_HOME/build-tools/30.0.3" >> $GITHUB_PATH
+          
+          # Встановлюємо SDK компоненти
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses --sdk_root=$ANDROID_HOME < /dev/null || true
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-30" "build-tools;30.0.3" --sdk_root=$ANDROID_HOME < /dev/null
 
-      - name: Install NDK
+      - name: Install NDK 28c
         run: |
-          cd /root/.buildozer/android/platform
+          cd $HOME/.buildozer/android/platform
           wget -q https://dl.google.com/android/repository/android-ndk-r28c-linux.zip
           unzip -q android-ndk-r28c-linux.zip
           rm android-ndk-r28c-linux.zip
-          echo "ANDROIDNDK=/root/.buildozer/android/platform/android-ndk-r28c" >> $GITHUB_ENV
+          echo "ANDROIDNDK=$HOME/.buildozer/android/platform/android-ndk-r28c" >> $GITHUB_ENV
 
       - name: Create buildozer.spec
         run: |
@@ -70,17 +78,16 @@ jobs:
 
           [buildozer]
           log_level = 2
-          warn_on_root = 0
           EOF
 
       - name: Build APK
         run: |
-          export ANDROID_HOME=/root/.buildozer/android/platform/android-sdk
-          export ANDROIDNDK=/root/.buildozer/android/platform/android-ndk-r28c
+          export ANDROID_HOME=$HOME/.buildozer/android/platform/android-sdk
+          export ANDROIDNDK=$HOME/.buildozer/android/platform/android-ndk-r28c
           export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
           export PATH=$ANDROID_HOME/build-tools/30.0.3:$PATH
           
-          yes | buildozer -v android debug
+          buildozer -v android debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
