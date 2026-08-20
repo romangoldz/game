@@ -1,4 +1,4 @@
-name: Build Pygame APK
+name: Build APK with Docker
 
 on:
   workflow_dispatch:
@@ -6,47 +6,29 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: kivy/buildozer:latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-
-      - name: Install dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y openjdk-17-jdk unzip zip \
-            autoconf libtool pkg-config zlib1g-dev \
-            libncurses5-dev libncursesw5-dev \
-            cmake libffi-dev libssl-dev
-          pip install buildozer cython
-
       - name: Create buildozer.spec
         run: |
-          echo "[app]" > buildozer.spec
-          echo "title = My Game" >> buildozer.spec
-          echo "package.name = mygame" >> buildozer.spec
-          echo "package.domain = org.mygame" >> buildozer.spec
-          echo "source.dir = ." >> buildozer.spec
-          echo "source.include_exts = py,png,jpg,wav,mp3,ogg,ttf" >> buildozer.spec
-          echo "version = 0.1" >> buildozer.spec
-          echo "requirements = python3,pygame" >> buildozer.spec
-          echo "orientation = landscape" >> buildozer.spec
-          echo "fullscreen = 1" >> buildozer.spec
-          echo "android.api = 33" >> buildozer.spec
-          echo "android.minapi = 21" >> buildozer.spec
-          echo "android.ndk = 25b" >> buildozer.spec
-          echo "android.sdk = 33" >> buildozer.spec
-          echo "android.entrypoint = org.kivy.android.PythonActivity" >> buildozer.spec
-          echo "android.permissions = INTERNET" >> buildozer.spec
-          echo "android.gradle_dependencies =" >> buildozer.spec
-          echo "" >> buildozer.spec
-          echo "[buildozer]" >> buildozer.spec
-          echo "log_level = 2" >> buildozer.spec
-          echo "warn_on_root = 1" >> buildozer.spec
+          cat > buildozer.spec << 'EOF'
+          [app]
+          title = My Game
+          package.name = mygame
+          package.domain = org.mygame
+          source.dir = .
+          version = 0.1
+          requirements = python3,pygame
+          android.api = 30
+          android.minapi = 21
+          android.ndk = 23b
+          android.sdk = 30
+          fullscreen = 1
+          orientation = landscape
+          EOF
 
       - name: Build APK
         run: |
