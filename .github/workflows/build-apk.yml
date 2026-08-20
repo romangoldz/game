@@ -1,4 +1,4 @@
-name: Build APK with Docker
+name: Build Pygame APK
 
 on:
   workflow_dispatch:
@@ -6,11 +6,31 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container:
-      image: kivy/buildozer:latest
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y openjdk-17-jdk unzip zip \
+            autoconf libtool pkg-config zlib1g-dev \
+            libncurses5-dev libncursesw5-dev \
+            cmake libffi-dev libssl-dev git wget
+          pip install buildozer cython
+
+      - name: Download NDK 28c
+        run: |
+          mkdir -p ~/.buildozer/android/platform
+          cd ~/.buildozer/android/platform
+          wget -q https://dl.google.com/android/repository/android-ndk-r28c-linux.zip
+          unzip -q android-ndk-r28c-linux.zip
+          rm android-ndk-r28c-linux.zip
 
       - name: Create buildozer.spec
         run: |
@@ -22,24 +42,21 @@ jobs:
           source.dir = .
           version = 0.1
           requirements = python3,pygame
+          orientation = landscape
+          fullscreen = 1
           android.api = 30
           android.minapi = 21
-          android.ndk = 23b
+          android.ndk = 28c
           android.sdk = 30
-          fullscreen = 1
-          orientation = landscape
 
           [buildozer]
           log_level = 2
-          warn_on_root = 0
           EOF
 
       - name: Build APK
         run: |
-          # Встановлюємо змінну для автоматичного підтвердження
-          export BUILDOZER_WARN_ON_ROOT=0
-          # Запускаємо збірку без інтерактивного режиму
-          yes | buildozer -v android debug || buildozer -v android debug
+          export ANDROIDNDK=~/.buildozer/android/platform/android-ndk-r28c
+          buildozer -v android debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
