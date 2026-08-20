@@ -1,38 +1,47 @@
 name: Build Pygame APK
 
 on:
+  push:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    container:
-      image: kivy/buildozer:latest
-
     steps:
     - uses: actions/checkout@v4
 
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y openjdk-17-jdk unzip zip \
+          autoconf libtool pkg-config zlib1g-dev \
+          libncurses5-dev libncursesw5-dev \
+          cmake libffi-dev libssl-dev
+        pip install --upgrade pip
+        pip install buildozer cython
+
+    - name: Configure Buildozer
+      run: |
+        buildozer init
+        # Базові налаштування
+        sed -i 's/^#.*requirements.*/requirements = python3,pygame/' buildozer.spec
+        sed -i 's/^#.*package.name.*/package.name = mygame/' buildozer.spec
+        sed -i 's/^#.*package.domain.*/package.domain = org.mygame/' buildozer.spec
+        sed -i 's/^#.*android.api.*/android.api = 33/' buildozer.spec
+        sed -i 's/^#.*android.minapi.*/android.minapi = 21/' buildozer.spec
+        sed -i 's/^#.*android.ndk.*/android.ndk = 25b/' buildozer.spec
+        sed -i 's/^#.*android.sdk.*/android.sdk = 33/' buildozer.spec
+        # Вимкнути бібліотеки, які викликають помилки
+        sed -i 's/^#.*android.gradle_dependencies.*/android.gradle_dependencies = /' buildozer.spec
+
     - name: Build APK
       run: |
-        # Видаляємо старий spec, якщо є
-        rm -f buildozer.spec
-        
-        # Створюємо новий
-        buildozer init
-        
-        # Налаштовуємо
-        sed -i 's/^requirements.*/requirements = python3,pygame/' buildozer.spec
-        sed -i 's/^package.name.*/package.name = mygame/' buildozer.spec
-        sed -i 's/^package.domain.*/package.domain = org.mygame/' buildozer.spec
-        sed -i 's/^android.api.*/android.api = 33/' buildozer.spec
-        sed -i 's/^android.minapi.*/android.minapi = 21/' buildozer.spec
-        sed -i 's/^android.ndk.*/android.ndk = 25b/' buildozer.spec
-        sed -i 's/^android.sdk.*/android.sdk = 33/' buildozer.spec
-        
-        # Якщо є файли ресурсів - додаємо їх
-        echo "source.include_exts = py,png,jpg,kv,atlas,wav,mp3,ttf" >> buildozer.spec
-        
-        # Запускаємо збірку
         buildozer -v android debug
 
     - name: Upload APK
