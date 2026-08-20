@@ -28,11 +28,18 @@ jobs:
           android.sdk = 30
           fullscreen = 1
           orientation = landscape
+
+          [buildozer]
+          log_level = 2
+          warn_on_root = 0
           EOF
 
       - name: Build APK
         run: |
-          buildozer -v android debug
+          # Встановлюємо змінну для автоматичного підтвердження
+          export BUILDOZER_WARN_ON_ROOT=0
+          # Запускаємо збірку без інтерактивного режиму
+          yes | buildozer -v android debug || buildozer -v android debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
